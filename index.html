@@ -163,6 +163,54 @@
         body.touch.stage-puzzle #resetBtn,
         body.touch.game-lost #resetBtn { display: flex; align-items: center; justify-content: center; }
 
+        #levelSelect {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            z-index: 60;
+        }
+        #levelBtn {
+            border: none;
+            background: rgba(40,38,48,0.9);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.55), 0 0 0 1.5px rgba(160,30,40,0.4);
+            color: var(--ink);
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-family: 'Fredoka', sans-serif;
+            font-weight: 600;
+            font-size: 0.82em;
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #levelMenu {
+            display: none;
+            margin-top: 8px;
+            background: #15141B;
+            border: 1px solid rgba(160,30,40,0.45);
+            border-radius: 14px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.75);
+            overflow: hidden;
+            min-width: 168px;
+        }
+        #levelSelect.open #levelMenu { display: block; }
+        .lvlOpt {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: none;
+            background: transparent;
+            color: var(--ink);
+            padding: 11px 16px;
+            font-family: 'Fredoka', sans-serif;
+            font-size: 0.82em;
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .lvlOpt + .lvlOpt { border-top: 1px solid rgba(255,255,255,0.06); }
+        .lvlOpt:hover, .lvlOpt:active { background: rgba(181,20,42,0.4); color: #fff; }
+
         /* ---------- Responsive layout for narrow screens ---------- */
         @media (max-width: 720px) {
             #stage { margin-top: 64px; padding: 0 4px; }
@@ -353,6 +401,10 @@
                 right: 16px;
             }
             #resetBtn { width: 40px; height: 40px; font-size: 18px; top: 10px; right: 10px; }
+            #levelSelect { top: 10px; left: 10px; }
+            #levelBtn { font-size: 0.7em; padding: 6px 11px; }
+            .lvlOpt { font-size: 0.7em; padding: 9px 13px; }
+            #levelMenu { min-width: 150px; }
         }
     </style>
 </head>
@@ -386,6 +438,15 @@
     <div id="title">
         <div class="big">玩具工廠 🏭</div>
         <div class="small">Boss Battle Prototype</div>
+    </div>
+
+    <div id="levelSelect">
+        <button id="levelBtn" aria-label="跳關">☰ 跳關</button>
+        <div id="levelMenu">
+            <button class="lvlOpt" data-stage="1">關卡 1 ・ 色彩配對</button>
+            <button class="lvlOpt" data-stage="2">關卡 2 ・ 彩虹排列</button>
+            <button class="lvlOpt" data-stage="3">關卡 3 ・ 魔王戰 💀</button>
+        </div>
     </div>
 
     <button id="resetBtn" data-key="r" data-stage="puzzle" aria-label="重來這關">↻</button>
@@ -509,8 +570,12 @@ const boss = {
     firstStuckSpawned: false,
     isInvulnerable: false,
     idleOffset: 0,
-    hitFlash: 0
+    hitFlash: 0,
+    tx: canvas.width / 2,  // wander target
+    ty: 150,
+    moveTimer: 0
 };
+const BOSS_SPEED = 1.1; // slow drift (~66 px/s) — harder to aim at, not twitchy
 
 // Stuck-object cadence: 60s grace period before first one, then every 8s.
 const STUCK_FIRST_DELAY = 3600; // 60s @ 60fps
@@ -662,6 +727,21 @@ document.querySelectorAll('.dbtn').forEach(bindTouchButton);
 bindTouchButton(document.getElementById('fireBtn'));
 bindTouchButton(document.getElementById('resetBtn'));
 
+// Level-select dropdown — jump straight to any stage at any time.
+const levelSelect = document.getElementById('levelSelect');
+document.getElementById('levelBtn').addEventListener('click', ev => {
+    ev.stopPropagation();
+    levelSelect.classList.toggle('open');
+});
+document.querySelectorAll('.lvlOpt').forEach(opt => {
+    opt.addEventListener('click', ev => {
+        ev.stopPropagation();
+        levelSelect.classList.remove('open');
+        loadStage(parseInt(opt.dataset.stage, 10));
+    });
+});
+document.addEventListener('click', () => levelSelect.classList.remove('open'));
+
 // =============================================================
 // HELPERS
 // =============================================================
@@ -759,6 +839,11 @@ function loadStage(n) {
         boss.isInvulnerable = false;
         boss.hitFlash = 0;
         boss.idleOffset = 0;
+        boss.x = canvas.width / 2;
+        boss.y = 150;
+        boss.tx = canvas.width / 2;
+        boss.ty = 150;
+        boss.moveTimer = 0;
         player.x = canvas.width / 2;
         player.y = canvas.height - 80;
         player.facingX = 0;
@@ -1130,16 +1215,76 @@ function drawBoss() {
     ctx.textBaseline = 'middle';
     ctx.fillText(Math.max(0, Math.round(hpRatio * 100)) + '%', cx, cy + 11);
 
-    // Head
-    const headGrad = ctx.createLinearGradient(cx - 28, cy - h / 2 - 28, cx + 28, cy - h / 2 + 8);
-    headGrad.addColorStop(0, '#3A3742');
-    headGrad.addColorStop(1, '#1A181E');
-    ctx.fillStyle = headGrad;
-    roundRectPath(cx - 28, cy - h / 2 - 26, 56, 38, 8);
+    // ---- Skull head (robot skull) ----
+    const sx = cx;
+    const craniumCY = cy - h / 2 - 6;
+    const craniumRX = 30, craniumRY = 24;
+
+    // Antennae (robotic, red beacons)
+    ctx.strokeStyle = '#5A6068';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(sx - 13, craniumCY - craniumRY + 5);
+    ctx.lineTo(sx - 22, cy - h / 2 - 48);
+    ctx.moveTo(sx + 13, craniumCY - craniumRY + 5);
+    ctx.lineTo(sx + 22, cy - h / 2 - 48);
+    ctx.stroke();
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#FF3A1A';
+    ctx.fillStyle = '#FF3A1A';
+    ctx.beginPath();
+    ctx.arc(sx - 22, cy - h / 2 - 48, 4, 0, Math.PI * 2);
+    ctx.arc(sx + 22, cy - h / 2 - 48, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Cranium dome (bone-coloured metal)
+    const skullGrad = ctx.createLinearGradient(sx - craniumRX, craniumCY - craniumRY, sx + craniumRX, craniumCY + craniumRY);
+    skullGrad.addColorStop(0, '#CDC6BA');
+    skullGrad.addColorStop(1, '#6E675C');
+    ctx.fillStyle = skullGrad;
+    ctx.beginPath();
+    ctx.ellipse(sx, craniumCY, craniumRX, craniumRY, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 1.2;
     ctx.stroke();
 
+    // Tapered jaw / cheekbones
+    ctx.fillStyle = skullGrad;
+    ctx.beginPath();
+    ctx.moveTo(sx - 22, craniumCY + craniumRY - 7);
+    ctx.quadraticCurveTo(sx - 19, craniumCY + craniumRY + 13, sx - 10, craniumCY + craniumRY + 19);
+    ctx.lineTo(sx + 10, craniumCY + craniumRY + 19);
+    ctx.quadraticCurveTo(sx + 19, craniumCY + craniumRY + 13, sx + 22, craniumCY + craniumRY - 7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Robot skull seams + rivets
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, craniumCY - craniumRY + 2);
+    ctx.lineTo(sx, craniumCY - 5);
+    ctx.moveTo(sx - craniumRX + 7, craniumCY - 5);
+    ctx.quadraticCurveTo(sx, craniumCY - 13, sx + craniumRX - 7, craniumCY - 5);
+    ctx.stroke();
+    ctx.fillStyle = '#4A4750';
+    [[-craniumRX + 7, craniumCY - 3], [craniumRX - 7, craniumCY - 3], [0, craniumCY - craniumRY + 7]].forEach(p => {
+        ctx.beginPath();
+        ctx.arc(sx + p[0], p[1], 1.8, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // Deep hollow eye sockets
+    ctx.fillStyle = '#0A0A0C';
+    ctx.beginPath();
+    ctx.ellipse(sx - 11, craniumCY + 2, 8, 9, 0.18, 0, Math.PI * 2);
+    ctx.ellipse(sx + 11, craniumCY + 2, 8, 9, -0.18, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Glowing eyes deep in the sockets
     let eyeColor = '#FF1A1A';
     if (boss.isInvulnerable) eyeColor = '#FF6A2A';
     if (lowHP) eyeColor = Math.sin(Date.now() / 100) > 0 ? '#FF0000' : '#AA0000';
@@ -1147,41 +1292,35 @@ function drawBoss() {
     ctx.shadowColor = eyeColor;
     ctx.fillStyle = eyeColor;
     ctx.beginPath();
-    ctx.arc(cx - 11, cy - h / 2 - 10, 4.5, 0, Math.PI * 2);
-    ctx.arc(cx + 11, cy - h / 2 - 10, 4.5, 0, Math.PI * 2);
+    ctx.arc(sx - 11, craniumCY + 3, 3.4, 0, Math.PI * 2);
+    ctx.arc(sx + 11, craniumCY + 3, 3.4, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+
+    // Nasal cavity
+    ctx.fillStyle = '#0A0A0C';
     ctx.beginPath();
-    ctx.arc(cx - 12, cy - h / 2 - 11, 1.2, 0, Math.PI * 2);
-    ctx.arc(cx + 10, cy - h / 2 - 11, 1.2, 0, Math.PI * 2);
+    ctx.moveTo(sx, craniumCY + 9);
+    ctx.lineTo(sx - 4, craniumCY + 17);
+    ctx.lineTo(sx + 4, craniumCY + 17);
+    ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    // Grinning teeth on the jaw
+    const teethTop = craniumCY + craniumRY - 3;
+    ctx.fillStyle = '#CDC6BA';
+    roundRectPath(sx - 16, teethTop, 32, 14, 3);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
     ctx.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
-        ctx.beginPath();
-        ctx.moveTo(cx - 8 + i * 5, cy - h / 2 + 2);
-        ctx.lineTo(cx - 8 + i * 5, cy - h / 2 + 8);
-        ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx - 16, teethTop + 7);
+    ctx.lineTo(sx + 16, teethTop + 7);
+    for (let i = -3; i <= 3; i++) {
+        ctx.moveTo(sx + i * 4.6, teethTop);
+        ctx.lineTo(sx + i * 4.6, teethTop + 14);
     }
-
-    ctx.strokeStyle = '#5A6068';
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 18, cy - h / 2 - 26);
-    ctx.lineTo(cx - 24, cy - h / 2 - 42);
-    ctx.moveTo(cx + 18, cy - h / 2 - 26);
-    ctx.lineTo(cx + 24, cy - h / 2 - 42);
     ctx.stroke();
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = '#FF3A1A';
-    ctx.fillStyle = '#FF3A1A';
-    ctx.beginPath();
-    ctx.arc(cx - 24, cy - h / 2 - 42, 4, 0, Math.PI * 2);
-    ctx.arc(cx + 24, cy - h / 2 - 42, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
 
     // Cracks — always on; deeper, with a red inner glow when low HP
     if (lowHP) {
@@ -1723,6 +1862,21 @@ function updateBoss() {
     if (keys['space'] && player.shootCooldown <= 0) {
         fireBullet();
         player.shootCooldown = 12; // ~200ms between shots @ 60fps
+    }
+
+    // Slow autonomous wandering — makes aiming harder without being twitchy.
+    boss.moveTimer--;
+    if (boss.moveTimer <= 0) {
+        boss.tx = 90 + Math.random() * (canvas.width - 180);
+        boss.ty = 110 + Math.random() * 100; // stay in the upper area
+        boss.moveTimer = 150 + Math.random() * 120; // re-target every 2.5–4.5 s
+    }
+    const bdx = boss.tx - boss.x, bdy = boss.ty - boss.y;
+    const bd = Math.hypot(bdx, bdy);
+    if (bd > 1) {
+        const step = Math.min(BOSS_SPEED, bd);
+        boss.x += (bdx / bd) * step;
+        boss.y += (bdy / bd) * step;
     }
 
     boss.idleOffset += 0.04;
