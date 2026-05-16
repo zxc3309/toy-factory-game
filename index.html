@@ -187,23 +187,6 @@
             #ui { top: -50px; }
             #topRow { flex-direction: column; gap: 4px; align-items: center; }
         }
-        /* ---------- Landscape on phones: shrink chrome, fit canvas ---------- */
-        @media (orientation: landscape) and (max-height: 480px) {
-            #stage {
-                margin-top: 52px;
-                padding: 0 4px;
-                max-width: min(800px, calc((100vh - 64px) * 4 / 3));
-                max-width: min(800px, calc((100dvh - 64px) * 4 / 3));
-            }
-            #gameCanvas { border-width: 4px; border-radius: 16px; }
-            #ui { top: -46px; }
-            #topRow { gap: 6px; }
-            #stageBadge { font-size: 0.72em; padding: 3px 10px; }
-            #gameStatus { font-size: 0.78em; padding: 4px 12px; }
-            #hpRow, #playerHpRow { font-size: 0.7em; padding: 3px 9px 3px 11px; }
-            .health-bar-container { width: 120px; height: 9px; }
-        }
-
         #ui {
             position: absolute;
             top: -80px;
@@ -325,6 +308,50 @@
         }
         #title .big { font-size: 1.4em; color: var(--pink); }
         #title .small { font-size: 0.75em; }
+
+        /* ---------- Landscape on phones ----------
+           Placed last so these rules win the cascade over the base ones.
+           The canvas fills the viewport height and the compact HUD floats
+           over the (mostly empty) top strip, so the WHOLE game is visible. */
+        @media (orientation: landscape) and (max-height: 600px) {
+            #stage {
+                margin: 0 auto;
+                padding: 0 2px;
+                max-width: min(800px, calc((100vh - 10px) * 4 / 3));
+                max-width: min(800px, calc((100dvh - 10px) * 4 / 3));
+            }
+            #gameCanvas { border-width: 3px; border-radius: 14px; }
+            #ui {
+                top: 5px;
+                left: 6px; right: 6px;
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 5px 8px;
+            }
+            #topRow { gap: 6px; }
+            #stageBadge { font-size: 0.62em; padding: 2px 8px; }
+            #gameStatus { font-size: 0.66em; padding: 3px 10px; }
+            #hpRow, #playerHpRow { font-size: 0.6em; padding: 2px 8px 2px 9px; gap: 6px; }
+            #hpRow .hp-text, #playerHpRow .hp-text { min-width: 0; }
+            .health-bar-container { width: 90px; height: 8px; }
+            #dpad {
+                width: 120px; height: 120px;
+                bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+                left: 14px;
+            }
+            .dbtn { width: 40px; height: 40px; font-size: 18px; }
+            .dbtn[data-key="w"] { top: 0; left: 40px; }
+            .dbtn[data-key="a"] { top: 40px; left: 0; }
+            .dbtn[data-key="d"] { top: 40px; right: 0; }
+            .dbtn[data-key="s"] { top: 80px; left: 40px; }
+            #fireBtn {
+                width: 64px; height: 64px; font-size: 28px;
+                bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+                right: 16px;
+            }
+            #resetBtn { width: 40px; height: 40px; font-size: 18px; top: 10px; right: 10px; }
+        }
     </style>
 </head>
 <body>
