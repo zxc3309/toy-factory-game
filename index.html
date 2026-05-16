@@ -169,7 +169,7 @@
             #ui { top: -56px; }
             #stageBadge { font-size: 0.8em; padding: 5px 12px; }
             #gameStatus { font-size: 0.85em; padding: 6px 14px; }
-            #hpRow { font-size: 0.75em; padding: 4px 10px 4px 12px; }
+            #hpRow, #playerHpRow { font-size: 0.75em; padding: 4px 10px 4px 12px; }
             .health-bar-container { width: 140px; height: 10px; }
             #dpad { width: 144px; height: 144px;
                     bottom: calc(24px + env(safe-area-inset-bottom, 0px)); left: 14px; }
@@ -200,7 +200,7 @@
             #topRow { gap: 6px; }
             #stageBadge { font-size: 0.72em; padding: 3px 10px; }
             #gameStatus { font-size: 0.78em; padding: 4px 12px; }
-            #hpRow { font-size: 0.7em; padding: 3px 9px 3px 11px; }
+            #hpRow, #playerHpRow { font-size: 0.7em; padding: 3px 9px 3px 11px; }
             .health-bar-container { width: 120px; height: 9px; }
         }
 
@@ -246,7 +246,7 @@
             white-space: nowrap;
         }
 
-        #hpRow {
+        #hpRow, #playerHpRow {
             display: flex;
             align-items: center;
             gap: 10px;
@@ -257,8 +257,8 @@
             font-weight: 600;
             font-size: 0.9em;
         }
-        #hpRow .robot { font-size: 1.2em; }
-        #hpRow .hp-text { min-width: 80px; }
+        #hpRow .robot, #playerHpRow .robot { font-size: 1.2em; }
+        #hpRow .hp-text, #playerHpRow .hp-text { min-width: 80px; }
 
         .health-bar-container {
             width: 220px;
@@ -271,6 +271,14 @@
         #bossHealthBar {
             height: 100%;
             background: linear-gradient(180deg, #FF8FB8 0%, #FF6B9D 50%, #E63946 100%);
+            width: 100%;
+            border-radius: 999px;
+            transition: width 0.15s ease-out;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+        }
+        #playerHealthBar {
+            height: 100%;
+            background: linear-gradient(180deg, #B5E8CB 0%, #88D8B0 50%, #5BAA85 100%);
             width: 100%;
             border-radius: 999px;
             transition: width 0.15s ease-out;
@@ -332,6 +340,11 @@
             <span class="hp-text">魔王血量 <b id="hpText">1000</b></span>
             <div class="health-bar-container"><div id="bossHealthBar"></div></div>
         </div>
+        <div id="playerHpRow" style="display:none">
+            <span class="robot">⭐</span>
+            <span class="hp-text">玩家血量 <b id="playerHpText">100</b></span>
+            <div class="health-bar-container"><div id="playerHealthBar"></div></div>
+        </div>
     </div>
 
     <canvas id="gameCanvas" width="800" height="600"></canvas>
@@ -370,6 +383,9 @@ const bossHealthBar = document.getElementById('bossHealthBar');
 const gameStatus = document.getElementById('gameStatus');
 const stageBadge = document.getElementById('stageBadge');
 const hpRow = document.getElementById('hpRow');
+const playerHpRow = document.getElementById('playerHpRow');
+const playerHpText = document.getElementById('playerHpText');
+const playerHealthBar = document.getElementById('playerHealthBar');
 const controlsBody = document.getElementById('controlsBody');
 
 // =============================================================
@@ -447,7 +463,9 @@ const player = {
     isMoving: false,
     facingX: 0,
     facingY: -1, // default aim: up (toward boss)
-    shootCooldown: 0
+    shootCooldown: 0,
+    hp: 100,
+    maxHp: 100
 };
 
 const boss = {
@@ -470,6 +488,8 @@ const STUCK_FIRST_DELAY = 3600; // 60s @ 60fps
 const STUCK_REPEAT_DELAY = 480; //  8s @ 60fps
 // Minion (toy car) spawns: one at boss-stage start, then every 20s.
 const MINION_INTERVAL = 1200; // 20s @ 60fps
+const MINION_HP = 2;             // star bullets needed to destroy a minion
+const MINION_CONTACT_DAMAGE = 25; // HP the player loses when a minion rams them
 
 let bullets = [];
 let minions = [];
@@ -527,7 +547,9 @@ function spawnMinion() {
         radius: 11,
         color,
         speed: 1.5,
-        wheelRotation: 0
+        wheelRotation: 0,
+        hp: MINION_HP,
+        hitFlash: 0
     });
     spawnParticles(boss.x, boss.y + boss.height / 2 + 30, color, 8, 'star');
 }
@@ -712,14 +734,17 @@ function loadStage(n) {
         player.facingX = 0;
         player.facingY = -1;
         player.shootCooldown = 0;
+        player.hp = player.maxHp;
         spawnMinion(); // 一開始就出現一台小車車
         gameStatus.innerText = '🤖 最後一關：擊敗巨型機器能！';
         gameStatus.style.color = '#E63946';
         gameStatus.style.background = 'white';
         hpRow.style.display = 'flex';
+        playerHpRow.style.display = 'flex';
+        updatePlayerUI();
         controlsBody.innerHTML =
             '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動（八方向）<br>' +
-            '<kbd>Space</kbd> 發射星星子彈（朝你面對的方向）<br>' +
+            '<kbd>Space</kbd> 發射星星子彈（可打掉小怪，被小怪撞到會扣血）<br>' +
             '<span style="opacity:0.7">魔王 1 分鐘後會召喚積木塔保護自己 — 看到時先打破</span>';
         updateBossUI();
     } else {
@@ -736,6 +761,7 @@ function loadStage(n) {
         gameStatus.style.color = '#3D405B';
         gameStatus.style.background = 'white';
         hpRow.style.display = 'none';
+        playerHpRow.style.display = 'none';
         controlsBody.innerHTML =
             '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 一格一格走（可以推積木）<br>' +
             '<kbd>R</kbd> 重來這一關<br>' +
@@ -1185,6 +1211,11 @@ function drawMinion(m) {
     ctx.strokeStyle = 'rgba(0,0,0,0.25)';
     ctx.lineWidth = 1.2;
     ctx.stroke();
+    if (m.hitFlash > 0) {
+        ctx.fillStyle = 'rgba(255,255,255,0.75)';
+        roundRectPath(-m.radius * 1.1, -m.radius * 0.9, m.radius * 2.2, m.radius * 1.6, 5);
+        ctx.fill();
+    }
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     roundRectPath(-m.radius * 0.7, -m.radius * 0.5, m.radius * 1.4, m.radius * 0.7, 3);
     ctx.fill();
@@ -1663,6 +1694,22 @@ function updateBoss() {
             }
         }
 
+        for (let mIndex = minions.length - 1; mIndex >= 0; mIndex--) {
+            const mn = minions[mIndex];
+            if (Math.hypot(bullet.x - mn.x, bullet.y - mn.y) < bullet.radius + mn.radius) {
+                bullets.splice(bIndex, 1);
+                mn.hp -= 1;
+                mn.hitFlash = 6;
+                spawnParticles(bullet.x, bullet.y, bullet.color, 6, 'star');
+                if (mn.hp <= 0) {
+                    spawnParticles(mn.x, mn.y, null, 16, 'confetti');
+                    minions.splice(mIndex, 1);
+                    applyShake(2, 5);
+                }
+                return;
+            }
+        }
+
         if (gameActive && !boss.isInvulnerable && rectCircleColliding(bullet, {
             x: boss.x - boss.width / 2,
             y: boss.y - boss.height / 2,
@@ -1680,15 +1727,22 @@ function updateBoss() {
 
     for (let mIndex = minions.length - 1; mIndex >= 0; mIndex--) {
         const minion = minions[mIndex];
+        if (minion.hitFlash > 0) minion.hitFlash--;
         const angle = Math.atan2(player.y - minion.y, player.x - minion.x);
         minion.x += Math.cos(angle) * minion.speed;
         minion.y += Math.sin(angle) * minion.speed;
         const dist = Math.hypot(player.x - minion.x, player.y - minion.y);
         if (dist < player.radius + minion.radius) {
-            spawnParticles(player.x, player.y, '#FF6B9D', 20, 'confetti');
-            applyShake(8, 18);
-            endGame(false);
-            return;
+            // Minion rams the player: it's destroyed and the player loses HP.
+            minions.splice(mIndex, 1);
+            spawnParticles(player.x, player.y, '#FF6B9D', 18, 'confetti');
+            applyShake(7, 16);
+            player.hp -= MINION_CONTACT_DAMAGE;
+            updatePlayerUI();
+            if (player.hp <= 0) {
+                endGame(false);
+                return;
+            }
         }
     }
 
@@ -1770,6 +1824,12 @@ function updateBossUI() {
     }
 }
 
+function updatePlayerUI() {
+    const hp = Math.max(0, player.hp);
+    playerHpText.innerText = hp;
+    playerHealthBar.style.width = (hp / player.maxHp) * 100 + '%';
+}
+
 function endGame(win) {
     if (!gameActive) return;
     gameActive = false;
@@ -1783,7 +1843,7 @@ function endGame(win) {
         }
         applyShake(6, 20);
     } else {
-        gameStatus.innerText = '❌ 被小怪物抓到了！按 R 重試';
+        gameStatus.innerText = '❌ 血量歸零了！按 R 重試';
         gameStatus.style.color = '#E63946';
         gameStatus.style.background = '#FFE0E0';
         document.body.classList.add('game-lost');
