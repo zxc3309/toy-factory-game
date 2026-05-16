@@ -365,19 +365,21 @@
            over the (mostly empty) top strip, so the WHOLE game is visible. */
         @media (orientation: landscape) and (max-height: 600px) {
             #stage {
-                margin: 0 auto;
+                /* Reserve a slim strip above the canvas for the HUD so it
+                   never covers the boss/skull (which sits at the top). */
+                margin: 50px auto 0;
                 padding: 0 2px;
-                max-width: min(800px, calc((100vh - 10px) * 4 / 3));
-                max-width: min(800px, calc((100dvh - 10px) * 4 / 3));
+                max-width: min(800px, calc((100vh - 58px) * 4 / 3));
+                max-width: min(800px, calc((100dvh - 58px) * 4 / 3));
             }
             #gameCanvas { border-width: 3px; border-radius: 14px; }
             #ui {
-                top: 5px;
+                top: -46px;
                 left: 6px; right: 6px;
                 flex-direction: row;
                 flex-wrap: wrap;
                 justify-content: center;
-                gap: 5px 8px;
+                gap: 4px 8px;
             }
             #topRow { gap: 6px; }
             #stageBadge { font-size: 0.62em; padding: 2px 8px; }
@@ -1868,7 +1870,7 @@ function updateBoss() {
     boss.moveTimer--;
     if (boss.moveTimer <= 0) {
         boss.tx = 90 + Math.random() * (canvas.width - 180);
-        boss.ty = 110 + Math.random() * 100; // stay in the upper area
+        boss.ty = 135 + Math.random() * 85; // upper area, clear of the top edge
         boss.moveTimer = 150 + Math.random() * 120; // re-target every 2.5–4.5 s
     }
     const bdx = boss.tx - boss.x, bdy = boss.ty - boss.y;
