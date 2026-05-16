@@ -45,9 +45,9 @@
             /* Cap width so the 4:3 canvas height also fits the viewport.
                ~120px is reserved for the score UI above the canvas.
                Falls back to plain 800px on browsers without min()/dvh. */
-            max-width: min(800px, calc((100vh - 120px) * 4 / 3));
-            max-width: min(800px, calc((100dvh - 120px) * 4 / 3));
-            margin: 90px auto 0;
+            max-width: min(800px, calc((100vh - 124px) * 4 / 3));
+            max-width: min(800px, calc((100dvh - 124px) * 4 / 3));
+            margin: 108px auto 0;
             padding: 0 8px;
         }
 
@@ -213,10 +213,9 @@
 
         /* ---------- Responsive layout for narrow screens ---------- */
         @media (max-width: 720px) {
-            #stage { margin-top: 64px; padding: 0 4px; }
-            #ui { top: -56px; }
+            #stage { margin-top: 112px; padding: 0 4px; }
             #stageBadge { font-size: 0.8em; padding: 5px 12px; }
-            #gameStatus { font-size: 0.85em; padding: 6px 14px; }
+            #gameStatus { font-size: 0.85em; padding: 6px 14px; white-space: normal; text-align: center; }
             #hpRow, #playerHpRow { font-size: 0.75em; padding: 4px 10px 4px 12px; }
             .health-bar-container { width: 140px; height: 10px; }
             #dpad { width: 144px; height: 144px;
@@ -231,13 +230,16 @@
                        right: 18px; font-size: 36px; }
         }
         @media (orientation: portrait) and (max-width: 500px) {
-            #stage { margin-top: 56px; }
-            #ui { top: -50px; }
-            #topRow { flex-direction: column; gap: 4px; align-items: center; }
+            #stage { margin-top: 108px; }
+            #topRow { flex-wrap: wrap; justify-content: center; gap: 6px; }
         }
         #ui {
             position: absolute;
-            top: -80px;
+            /* Anchor the HUD to the canvas TOP and grow upward, so it can
+               never overflow down onto the canvas / cover the boss. */
+            top: auto;
+            bottom: 100%;
+            margin-bottom: 8px;
             left: 0; right: 0;
             display: flex;
             flex-direction: column;
@@ -367,14 +369,16 @@
             #stage {
                 /* Reserve a slim strip above the canvas for the HUD so it
                    never covers the boss/skull (which sits at the top). */
-                margin: 50px auto 0;
+                margin: 56px auto 0;
                 padding: 0 2px;
-                max-width: min(800px, calc((100vh - 58px) * 4 / 3));
-                max-width: min(800px, calc((100dvh - 58px) * 4 / 3));
+                max-width: min(800px, calc((100vh - 64px) * 4 / 3));
+                max-width: min(800px, calc((100dvh - 64px) * 4 / 3));
             }
             #gameCanvas { border-width: 3px; border-radius: 14px; }
             #ui {
-                top: -46px;
+                top: auto;
+                bottom: 100%;
+                margin-bottom: 6px;
                 left: 6px; right: 6px;
                 flex-direction: row;
                 flex-wrap: wrap;
