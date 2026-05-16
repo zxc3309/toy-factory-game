@@ -365,19 +365,21 @@
            over the (mostly empty) top strip, so the WHOLE game is visible. */
         @media (orientation: landscape) and (max-height: 600px) {
             #stage {
-                margin: 0 auto;
+                /* Reserve a slim strip above the canvas for the HUD so it
+                   never covers the boss/skull (which sits at the top). */
+                margin: 50px auto 0;
                 padding: 0 2px;
-                max-width: min(800px, calc((100vh - 10px) * 4 / 3));
-                max-width: min(800px, calc((100dvh - 10px) * 4 / 3));
+                max-width: min(800px, calc((100vh - 58px) * 4 / 3));
+                max-width: min(800px, calc((100dvh - 58px) * 4 / 3));
             }
             #gameCanvas { border-width: 3px; border-radius: 14px; }
             #ui {
-                top: 5px;
+                top: -46px;
                 left: 6px; right: 6px;
                 flex-direction: row;
                 flex-wrap: wrap;
                 justify-content: center;
-                gap: 5px 8px;
+                gap: 4px 8px;
             }
             #topRow { gap: 6px; }
             #stageBadge { font-size: 0.62em; padding: 2px 8px; }
@@ -580,8 +582,9 @@ const BOSS_SPEED = 1.1; // slow drift (~66 px/s) — harder to aim at, not twitc
 // Stuck-object cadence: 60s grace period before first one, then every 8s.
 const STUCK_FIRST_DELAY = 3600; // 60s @ 60fps
 const STUCK_REPEAT_DELAY = 480; //  8s @ 60fps
-// Minion (toy car) spawns: one at boss-stage start, then every 10s.
-const MINION_INTERVAL = 600; // 10s @ 60fps
+// Minion (toy car) spawns: a pair at boss-stage start, then 2 every 5s.
+const MINION_INTERVAL = 300; // 5s @ 60fps
+const MINION_PER_WAVE = 2;   // minions spawned per wave
 const MINION_HP = 2;             // star bullets needed to destroy a minion
 const MINION_CONTACT_DAMAGE = 25; // HP the player loses when a minion rams them
 
@@ -850,7 +853,7 @@ function loadStage(n) {
         player.facingY = -1;
         player.shootCooldown = 0;
         player.hp = player.maxHp;
-        spawnMinion(); // 一開始就出現一台小車車
+        for (let i = 0; i < MINION_PER_WAVE; i++) spawnMinion(); // 開場就有一波小車車
         gameStatus.innerText = '🤖 最後一關：擊敗巨型機器能！';
         gameStatus.style.color = '#FF5C5C';
         gameStatus.style.background = '#241418';
@@ -1215,110 +1218,77 @@ function drawBoss() {
     ctx.textBaseline = 'middle';
     ctx.fillText(Math.max(0, Math.round(hpRatio * 100)) + '%', cx, cy + 11);
 
-    // ---- Skull head (robot skull) ----
+    // ---- Skull head: square head + curved horns (matches the sketch) ----
     const sx = cx;
-    const craniumCY = cy - h / 2 - 6;
-    const craniumRX = 30, craniumRY = 24;
+    const headW = 64, headH = 58;
+    const headCY = cy - h / 2 - 3;
+    const headTop = headCY - headH / 2;
 
-    // Antennae (robotic, red beacons)
-    ctx.strokeStyle = '#5A6068';
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.moveTo(sx - 13, craniumCY - craniumRY + 5);
-    ctx.lineTo(sx - 22, cy - h / 2 - 48);
-    ctx.moveTo(sx + 13, craniumCY - craniumRY + 5);
-    ctx.lineTo(sx + 22, cy - h / 2 - 48);
-    ctx.stroke();
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = '#FF3A1A';
-    ctx.fillStyle = '#FF3A1A';
-    ctx.beginPath();
-    ctx.arc(sx - 22, cy - h / 2 - 48, 4, 0, Math.PI * 2);
-    ctx.arc(sx + 22, cy - h / 2 - 48, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Cranium dome (bone-coloured metal)
-    const skullGrad = ctx.createLinearGradient(sx - craniumRX, craniumCY - craniumRY, sx + craniumRX, craniumCY + craniumRY);
+    const skullGrad = ctx.createLinearGradient(sx - headW / 2, headTop, sx + headW / 2, headTop + headH);
     skullGrad.addColorStop(0, '#CDC6BA');
     skullGrad.addColorStop(1, '#6E675C');
+
+    // Curved horns (drawn first so the head edge covers their roots)
     ctx.fillStyle = skullGrad;
-    ctx.beginPath();
-    ctx.ellipse(sx, craniumCY, craniumRX, craniumRY, 0, 0, Math.PI * 2);
-    ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    // Tapered jaw / cheekbones
-    ctx.fillStyle = skullGrad;
+    // left horn
     ctx.beginPath();
-    ctx.moveTo(sx - 22, craniumCY + craniumRY - 7);
-    ctx.quadraticCurveTo(sx - 19, craniumCY + craniumRY + 13, sx - 10, craniumCY + craniumRY + 19);
-    ctx.lineTo(sx + 10, craniumCY + craniumRY + 19);
-    ctx.quadraticCurveTo(sx + 19, craniumCY + craniumRY + 13, sx + 22, craniumCY + craniumRY - 7);
+    ctx.moveTo(sx - 28, headTop + 10);
+    ctx.quadraticCurveTo(sx - 52, headTop - 4, sx - 58, headTop - 34);
+    ctx.quadraticCurveTo(sx - 42, headTop - 8, sx - 18, headTop + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // right horn
+    ctx.beginPath();
+    ctx.moveTo(sx + 28, headTop + 10);
+    ctx.quadraticCurveTo(sx + 52, headTop - 4, sx + 58, headTop - 34);
+    ctx.quadraticCurveTo(sx + 42, headTop - 8, sx + 18, headTop + 4);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // Robot skull seams + rivets
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(sx, craniumCY - craniumRY + 2);
-    ctx.lineTo(sx, craniumCY - 5);
-    ctx.moveTo(sx - craniumRX + 7, craniumCY - 5);
-    ctx.quadraticCurveTo(sx, craniumCY - 13, sx + craniumRX - 7, craniumCY - 5);
+    // Square head
+    ctx.fillStyle = skullGrad;
+    roundRectPath(sx - headW / 2, headTop, headW, headH, 9);
+    ctx.fill();
     ctx.stroke();
+
+    // Corner rivets (still a robot)
     ctx.fillStyle = '#4A4750';
-    [[-craniumRX + 7, craniumCY - 3], [craniumRX - 7, craniumCY - 3], [0, craniumCY - craniumRY + 7]].forEach(p => {
+    [[-headW / 2 + 7, headTop + 7], [headW / 2 - 7, headTop + 7],
+     [-headW / 2 + 7, headTop + headH - 7], [headW / 2 - 7, headTop + headH - 7]].forEach(p => {
         ctx.beginPath();
         ctx.arc(sx + p[0], p[1], 1.8, 0, Math.PI * 2);
         ctx.fill();
     });
 
-    // Deep hollow eye sockets
-    ctx.fillStyle = '#0A0A0C';
-    ctx.beginPath();
-    ctx.ellipse(sx - 11, craniumCY + 2, 8, 9, 0.18, 0, Math.PI * 2);
-    ctx.ellipse(sx + 11, craniumCY + 2, 8, 9, -0.18, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Glowing eyes deep in the sockets
+    // Square eye sockets with a red glow inside
     let eyeColor = '#FF1A1A';
     if (boss.isInvulnerable) eyeColor = '#FF6A2A';
     if (lowHP) eyeColor = Math.sin(Date.now() / 100) > 0 ? '#FF0000' : '#AA0000';
-    ctx.shadowBlur = 16;
+    const eyeS = 15, eyeY = headTop + 14;
+    ctx.fillStyle = '#0A0A0C';
+    roundRectPath(sx - 21, eyeY, eyeS, eyeS, 2); ctx.fill();
+    roundRectPath(sx + 6,  eyeY, eyeS, eyeS, 2); ctx.fill();
+    ctx.shadowBlur = 14;
     ctx.shadowColor = eyeColor;
     ctx.fillStyle = eyeColor;
-    ctx.beginPath();
-    ctx.arc(sx - 11, craniumCY + 3, 3.4, 0, Math.PI * 2);
-    ctx.arc(sx + 11, craniumCY + 3, 3.4, 0, Math.PI * 2);
-    ctx.fill();
+    roundRectPath(sx - 18, eyeY + 3, eyeS - 6, eyeS - 6, 1.5); ctx.fill();
+    roundRectPath(sx + 9,  eyeY + 3, eyeS - 6, eyeS - 6, 1.5); ctx.fill();
     ctx.shadowBlur = 0;
 
-    // Nasal cavity
-    ctx.fillStyle = '#0A0A0C';
+    // Barred mouth (horizontal line crossed by 3 vertical bars)
+    const mY = headTop + headH - 16;
+    ctx.strokeStyle = '#0A0A0C';
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.moveTo(sx, craniumCY + 9);
-    ctx.lineTo(sx - 4, craniumCY + 17);
-    ctx.lineTo(sx + 4, craniumCY + 17);
-    ctx.closePath();
-    ctx.fill();
-
-    // Grinning teeth on the jaw
-    const teethTop = craniumCY + craniumRY - 3;
-    ctx.fillStyle = '#CDC6BA';
-    roundRectPath(sx - 16, teethTop, 32, 14, 3);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(sx - 16, teethTop + 7);
-    ctx.lineTo(sx + 16, teethTop + 7);
-    for (let i = -3; i <= 3; i++) {
-        ctx.moveTo(sx + i * 4.6, teethTop);
-        ctx.lineTo(sx + i * 4.6, teethTop + 14);
+    ctx.moveTo(sx - 17, mY);
+    ctx.lineTo(sx + 17, mY);
+    for (let i = -1; i <= 1; i++) {
+        ctx.moveTo(sx + i * 10, mY - 7);
+        ctx.lineTo(sx + i * 10, mY + 7);
     }
     ctx.stroke();
 
@@ -1868,7 +1838,7 @@ function updateBoss() {
     boss.moveTimer--;
     if (boss.moveTimer <= 0) {
         boss.tx = 90 + Math.random() * (canvas.width - 180);
-        boss.ty = 110 + Math.random() * 100; // stay in the upper area
+        boss.ty = 135 + Math.random() * 85; // upper area, clear of the top edge
         boss.moveTimer = 150 + Math.random() * 120; // re-target every 2.5–4.5 s
     }
     const bdx = boss.tx - boss.x, bdy = boss.ty - boss.y;
@@ -1970,7 +1940,7 @@ function updateBoss() {
     boss.stuckObjectTimer++;
 
     if (boss.summonTimer > MINION_INTERVAL) {
-        spawnMinion();
+        for (let i = 0; i < MINION_PER_WAVE; i++) spawnMinion();
         boss.summonTimer = 0;
     }
 
