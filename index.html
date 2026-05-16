@@ -42,6 +42,11 @@
             position: relative;
             width: 100%;
             max-width: 800px;
+            /* Cap width so the 4:3 canvas height also fits the viewport.
+               ~120px is reserved for the score UI above the canvas.
+               Falls back to plain 800px on browsers without min()/dvh. */
+            max-width: min(800px, calc((100vh - 120px) * 4 / 3));
+            max-width: min(800px, calc((100dvh - 120px) * 4 / 3));
             margin: 90px auto 0;
             padding: 0 8px;
         }
@@ -70,12 +75,14 @@
             right: 0;
             pointer-events: none;
             z-index: 100;
-            padding-bottom: env(safe-area-inset-bottom, 0);
         }
 
         #dpad {
             position: absolute;
-            bottom: 18px;
+            /* Keep the lowest (down) button clear of the phone's bottom
+               home-bar / gesture strip, otherwise holding it triggers a
+               touchcancel and "move down" stops. */
+            bottom: calc(28px + env(safe-area-inset-bottom, 0px));
             left: 18px;
             width: 168px;
             height: 168px;
@@ -112,7 +119,7 @@
 
         #fireBtn {
             position: absolute;
-            bottom: 38px;
+            bottom: calc(34px + env(safe-area-inset-bottom, 0px));
             right: 28px;
             width: 96px;
             height: 96px;
@@ -164,18 +171,37 @@
             #gameStatus { font-size: 0.85em; padding: 6px 14px; }
             #hpRow { font-size: 0.75em; padding: 4px 10px 4px 12px; }
             .health-bar-container { width: 140px; height: 10px; }
-            #dpad { width: 144px; height: 144px; bottom: 14px; left: 14px; }
+            #dpad { width: 144px; height: 144px;
+                    bottom: calc(24px + env(safe-area-inset-bottom, 0px)); left: 14px; }
             .dbtn { width: 48px; height: 48px; font-size: 22px; }
             .dbtn[data-key="w"] { top: 0; left: 48px; }
             .dbtn[data-key="a"] { top: 48px; left: 0; }
             .dbtn[data-key="d"] { top: 48px; right: 0; }
             .dbtn[data-key="s"] { top: 96px; left: 48px; }
-            #fireBtn { width: 80px; height: 80px; bottom: 28px; right: 18px; font-size: 36px; }
+            #fireBtn { width: 80px; height: 80px;
+                       bottom: calc(30px + env(safe-area-inset-bottom, 0px));
+                       right: 18px; font-size: 36px; }
         }
         @media (orientation: portrait) and (max-width: 500px) {
             #stage { margin-top: 56px; }
             #ui { top: -50px; }
             #topRow { flex-direction: column; gap: 4px; align-items: center; }
+        }
+        /* ---------- Landscape on phones: shrink chrome, fit canvas ---------- */
+        @media (orientation: landscape) and (max-height: 480px) {
+            #stage {
+                margin-top: 52px;
+                padding: 0 4px;
+                max-width: min(800px, calc((100vh - 64px) * 4 / 3));
+                max-width: min(800px, calc((100dvh - 64px) * 4 / 3));
+            }
+            #gameCanvas { border-width: 4px; border-radius: 16px; }
+            #ui { top: -46px; }
+            #topRow { gap: 6px; }
+            #stageBadge { font-size: 0.72em; padding: 3px 10px; }
+            #gameStatus { font-size: 0.78em; padding: 4px 12px; }
+            #hpRow { font-size: 0.7em; padding: 3px 9px 3px 11px; }
+            .health-bar-container { width: 120px; height: 9px; }
         }
 
         #ui {
@@ -539,8 +565,16 @@ if (isTouchDevice) document.body.classList.add('touch');
 function bindTouchButton(el) {
     if (!el) return;
     const k = el.dataset.key;
+    let active = false;
     const press = ev => {
         ev.preventDefault();
+        if (active) return;
+        active = true;
+        // Capture the pointer so the press keeps firing even if the finger
+        // drifts off the (small) button — important for hold-to-move.
+        if (ev.pointerId != null && el.setPointerCapture) {
+            try { el.setPointerCapture(ev.pointerId); } catch (e) {}
+        }
         el.classList.add('pressed');
         keys[k] = true;
         // Discrete step in puzzle stages (mirror keydown logic)
@@ -557,17 +591,19 @@ function bindTouchButton(el) {
         }
     };
     const release = ev => {
-        ev.preventDefault();
+        if (ev) ev.preventDefault();
+        if (!active) return;
+        active = false;
         el.classList.remove('pressed');
         keys[k] = false;
     };
-    el.addEventListener('touchstart', press, { passive: false });
-    el.addEventListener('touchend', release, { passive: false });
-    el.addEventListener('touchcancel', release, { passive: false });
-    // Also support mouse for desktop testing
-    el.addEventListener('mousedown', press);
-    el.addEventListener('mouseup', release);
-    el.addEventListener('mouseleave', release);
+    // Pointer Events unify touch + mouse and, with pointer capture, are far
+    // more reliable for press-and-hold than the touch/mouse combo.
+    el.addEventListener('pointerdown', press);
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('lostpointercapture', release);
+    el.addEventListener('contextmenu', e => e.preventDefault());
 }
 
 document.querySelectorAll('.dbtn').forEach(bindTouchButton);
