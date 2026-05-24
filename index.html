@@ -33,7 +33,7 @@
             overflow: hidden;
             color: var(--ink);
             font-family: 'Fredoka', 'PingFang TC', sans-serif;
-            touch-action: manipulation;
+            touch-action: none;
             user-select: none;
             -webkit-user-select: none;
         }
@@ -586,9 +586,9 @@ const BOSS_SPEED = 1.1; // slow drift (~66 px/s) — harder to aim at, not twitc
 // Stuck-object cadence: 60s grace period before first one, then every 8s.
 const STUCK_FIRST_DELAY = 3600; // 60s @ 60fps
 const STUCK_REPEAT_DELAY = 480; //  8s @ 60fps
-// Minion (toy car) spawns: a pair at boss-stage start, then 2 every 5s.
+// Minion (toy car) spawns: one at boss-stage start, then 1 every 5s.
 const MINION_INTERVAL = 300; // 5s @ 60fps
-const MINION_PER_WAVE = 2;   // minions spawned per wave
+const MINION_PER_WAVE = 1;   // minions spawned per wave
 const MINION_HP = 2;             // star bullets needed to destroy a minion
 const MINION_CONTACT_DAMAGE = 25; // HP the player loses when a minion rams them
 
@@ -748,6 +748,23 @@ document.querySelectorAll('.lvlOpt').forEach(opt => {
     });
 });
 document.addEventListener('click', () => levelSelect.classList.remove('open'));
+
+// 阻擋手機雙指縮放（iOS Safari 常忽略 touch-action / user-scalable=no）
+['gesturestart', 'gesturechange', 'gestureend'].forEach(ev =>
+    document.addEventListener(ev, e => e.preventDefault(), { passive: false })
+);
+document.addEventListener('touchstart', e => {
+    if (e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+document.addEventListener('touchmove', e => {
+    if (e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+let _lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - _lastTouchEnd < 350) e.preventDefault();
+    _lastTouchEnd = now;
+}, { passive: false });
 
 // =============================================================
 // HELPERS
