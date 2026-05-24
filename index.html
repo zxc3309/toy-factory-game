@@ -77,45 +77,39 @@
             z-index: 100;
         }
 
-        #dpad {
+        #joystick {
             position: absolute;
-            /* Keep the lowest (down) button clear of the phone's bottom
-               home-bar / gesture strip, otherwise holding it triggers a
-               touchcancel and "move down" stops. */
+            /* Keep clear of the phone's bottom home-bar / gesture strip. */
             bottom: calc(28px + env(safe-area-inset-bottom, 0px));
             left: 18px;
             width: 168px;
             height: 168px;
-            pointer-events: auto;
-        }
-        .dbtn {
-            position: absolute;
-            width: 56px;
-            height: 56px;
             border-radius: 50%;
-            border: none;
-            background: rgba(40,38,48,0.88);
-            box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 0 1.5px rgba(160,30,40,0.4), inset 0 -3px 0 rgba(0,0,0,0.3);
-            color: var(--ink);
-            font-size: 28px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
+            background: rgba(40,38,48,0.55);
+            box-shadow:
+                0 4px 14px rgba(0,0,0,0.5),
+                0 0 0 1.5px rgba(160,30,40,0.4),
+                inset 0 4px 14px rgba(0,0,0,0.45);
+            pointer-events: auto;
             touch-action: none;
-            transition: transform 0.05s, background 0.05s;
             -webkit-tap-highlight-color: transparent;
         }
-        .dbtn.pressed {
-            background: var(--pink);
-            color: white;
-            transform: scale(0.92);
+        #joystickKnob {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 68px; height: 68px;
+            margin-left: -34px; margin-top: -34px;
+            border-radius: 50%;
+            background: rgba(80,76,90,0.96);
+            box-shadow:
+                0 4px 10px rgba(0,0,0,0.55),
+                0 0 0 1.5px rgba(181,20,42,0.5),
+                inset 0 -3px 0 rgba(0,0,0,0.35);
+            transition: transform 0.12s ease-out;
+            pointer-events: none;
+            will-change: transform;
         }
-        .dbtn[data-key="w"] { top: 0;   left: 56px; }
-        .dbtn[data-key="a"] { top: 56px; left: 0; }
-        .dbtn[data-key="d"] { top: 56px; right: 0; }
-        .dbtn[data-key="s"] { top: 112px; left: 56px; }
+        #joystick.active #joystickKnob { transition: none; }
 
         #fireBtn {
             position: absolute;
@@ -218,13 +212,9 @@
             #gameStatus { font-size: 0.85em; padding: 6px 14px; white-space: normal; text-align: center; }
             #hpRow, #playerHpRow { font-size: 0.75em; padding: 4px 10px 4px 12px; }
             .health-bar-container { width: 140px; height: 10px; }
-            #dpad { width: 144px; height: 144px;
-                    bottom: calc(24px + env(safe-area-inset-bottom, 0px)); left: 14px; }
-            .dbtn { width: 48px; height: 48px; font-size: 22px; }
-            .dbtn[data-key="w"] { top: 0; left: 48px; }
-            .dbtn[data-key="a"] { top: 48px; left: 0; }
-            .dbtn[data-key="d"] { top: 48px; right: 0; }
-            .dbtn[data-key="s"] { top: 96px; left: 48px; }
+            #joystick { width: 144px; height: 144px;
+                        bottom: calc(24px + env(safe-area-inset-bottom, 0px)); left: 14px; }
+            #joystickKnob { width: 60px; height: 60px; margin-left: -30px; margin-top: -30px; }
             #fireBtn { width: 80px; height: 80px;
                        bottom: calc(30px + env(safe-area-inset-bottom, 0px));
                        right: 18px; font-size: 36px; }
@@ -391,16 +381,12 @@
             #hpRow, #playerHpRow { font-size: 0.6em; padding: 2px 8px 2px 9px; gap: 6px; }
             #hpRow .hp-text, #playerHpRow .hp-text { min-width: 0; }
             .health-bar-container { width: 90px; height: 8px; }
-            #dpad {
+            #joystick {
                 width: 120px; height: 120px;
                 bottom: calc(14px + env(safe-area-inset-bottom, 0px));
                 left: 14px;
             }
-            .dbtn { width: 40px; height: 40px; font-size: 18px; }
-            .dbtn[data-key="w"] { top: 0; left: 40px; }
-            .dbtn[data-key="a"] { top: 40px; left: 0; }
-            .dbtn[data-key="d"] { top: 40px; right: 0; }
-            .dbtn[data-key="s"] { top: 80px; left: 40px; }
+            #joystickKnob { width: 52px; height: 52px; margin-left: -26px; margin-top: -26px; }
             #fireBtn {
                 width: 64px; height: 64px; font-size: 28px;
                 bottom: calc(18px + env(safe-area-inset-bottom, 0px));
@@ -459,11 +445,8 @@
 </div>
 
 <div id="touchControls">
-    <div id="dpad">
-        <button class="dbtn" data-key="w" aria-label="上">▲</button>
-        <button class="dbtn" data-key="a" aria-label="左">◄</button>
-        <button class="dbtn" data-key="d" aria-label="右">►</button>
-        <button class="dbtn" data-key="s" aria-label="下">▼</button>
+    <div id="joystick" aria-label="搖桿">
+        <div id="joystickKnob"></div>
     </div>
     <button id="fireBtn" data-key="space" data-stage="boss" aria-label="發射">★</button>
 </div>
@@ -730,9 +713,95 @@ function bindTouchButton(el) {
     el.addEventListener('contextmenu', e => e.preventDefault());
 }
 
-document.querySelectorAll('.dbtn').forEach(bindTouchButton);
 bindTouchButton(document.getElementById('fireBtn'));
 bindTouchButton(document.getElementById('resetBtn'));
+
+// Virtual joystick — replaces the 4-button d-pad. Drives the same keys[]
+// (w/a/s/d) so existing movement, aim, and puzzle-step logic work as-is.
+(function setupJoystick() {
+    const base = document.getElementById('joystick');
+    const knob = document.getElementById('joystickKnob');
+    if (!base || !knob) return;
+    let activeId = null;
+    let cx = 0, cy = 0, maxR = 0;
+    let lastDirKey = null; // for puzzle one-step-per-direction-entry
+
+    function clearKeys() {
+        keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
+    }
+
+    function applyDirection(dxNorm, dyNorm) {
+        // dxNorm,dyNorm in [-1,1] after clamping to maxR
+        const mag = Math.hypot(dxNorm, dyNorm);
+        const DEAD = 0.28;
+        let dirX = 0, dirY = 0;
+        if (mag >= DEAD) {
+            // 8-way snap: every 45° sector
+            const angle = Math.atan2(dyNorm, dxNorm);
+            const sector = ((Math.round(angle / (Math.PI / 4)) % 8) + 8) % 8;
+            // 0=right, 1=down-right, 2=down, 3=down-left, 4=left, 5=up-left, 6=up, 7=up-right
+            const map = [
+                [ 1, 0], [ 1, 1], [ 0, 1], [-1, 1],
+                [-1, 0], [-1,-1], [ 0,-1], [ 1,-1]
+            ];
+            [dirX, dirY] = map[sector];
+        }
+        keys['w'] = dirY < 0;
+        keys['s'] = dirY > 0;
+        keys['a'] = dirX < 0;
+        keys['d'] = dirX > 0;
+
+        // Puzzle stages use discrete steps: fire one step when entering a
+        // direction from neutral (matches the old d-pad's tap behaviour).
+        if (currentStage <= 2 && stageState === 'playing') {
+            const k = (dirX || dirY) ? `${dirX},${dirY}` : null;
+            if (k && lastDirKey === null) tryPushPlayer(dirX, dirY);
+            lastDirKey = k;
+        } else {
+            lastDirKey = null;
+        }
+    }
+
+    function start(ev) {
+        ev.preventDefault();
+        if (activeId !== null) return;
+        activeId = ev.pointerId;
+        base.classList.add('active');
+        try { base.setPointerCapture(ev.pointerId); } catch (e) {}
+        const rect = base.getBoundingClientRect();
+        cx = rect.left + rect.width / 2;
+        cy = rect.top + rect.height / 2;
+        maxR = rect.width * 0.35; // knob travels within 70% of the base diameter
+        move(ev);
+    }
+
+    function move(ev) {
+        if (ev.pointerId !== activeId) return;
+        ev.preventDefault();
+        let dx = ev.clientX - cx;
+        let dy = ev.clientY - cy;
+        const d = Math.hypot(dx, dy);
+        if (d > maxR) { dx = (dx / d) * maxR; dy = (dy / d) * maxR; }
+        knob.style.transform = `translate(${dx}px, ${dy}px)`;
+        applyDirection(dx / maxR, dy / maxR);
+    }
+
+    function end(ev) {
+        if (ev && ev.pointerId !== activeId) return;
+        activeId = null;
+        base.classList.remove('active');
+        knob.style.transform = '';
+        clearKeys();
+        lastDirKey = null;
+    }
+
+    base.addEventListener('pointerdown', start);
+    base.addEventListener('pointermove', move);
+    base.addEventListener('pointerup', end);
+    base.addEventListener('pointercancel', end);
+    base.addEventListener('lostpointercapture', end);
+    base.addEventListener('contextmenu', e => e.preventDefault());
+})();
 
 // Level-select dropdown — jump straight to any stage at any time.
 const levelSelect = document.getElementById('levelSelect');
