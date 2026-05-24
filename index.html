@@ -437,7 +437,8 @@
         <div id="levelMenu">
             <button class="lvlOpt" data-stage="1">關卡 1 ・ 色彩配對</button>
             <button class="lvlOpt" data-stage="2">關卡 2 ・ 彩虹排列</button>
-            <button class="lvlOpt" data-stage="3">關卡 3 ・ 魔王戰 💀</button>
+            <button class="lvlOpt" data-stage="3">關卡 3 ・ 小魔王 💀</button>
+            <button class="lvlOpt" data-stage="4">關卡 4 ・ 大魔王戰 💀💀</button>
         </div>
     </div>
 
@@ -484,7 +485,17 @@ const BLOCK_COLORS = {
     sky:   { fill: '#4A87A0', light: '#88BACC', dark: '#27505F' }
 };
 
-const STAGE = { PUZZLE_1: 1, PUZZLE_2: 2, BOSS: 3 };
+const STAGE = { PUZZLE_1: 1, PUZZLE_2: 2, MINI_BOSS: 3, BOSS: 4 };
+const TOTAL_STAGES = 4;
+function isBossStage(n) { return n === STAGE.MINI_BOSS || n === STAGE.BOSS; }
+const BOSS_CONFIGS = {
+    [STAGE.MINI_BOSS]: { maxHealth: 500,  width: 80,  height: 75,  spawnMinions: false,
+                         statusText: '🤖 第 3 關：擊敗小機器能！',
+                         introTitle: '🤖 第 3 關', introSubtitle: '小機器能來了！' },
+    [STAGE.BOSS]:      { maxHealth: 1000, width: 110, height: 100, spawnMinions: true,
+                         statusText: '🤖 最後一關：擊敗巨型機器能！',
+                         introTitle: '🤖 最後一關', introSubtitle: '巨型機器能出現了！' }
+};
 
 const STAGES = {
     1: {
@@ -694,7 +705,7 @@ function bindTouchButton(el) {
         }
         // Lose state retry (R)
         if (!gameActive && endOverlay && endOverlay.type === 'lose' && k === 'r') {
-            loadStage(STAGE.BOSS);
+            loadStage(currentStage);
         }
     };
     const release = ev => {
@@ -919,13 +930,18 @@ function loadStage(n) {
     particles = [];
     endOverlay = null;
     gameActive = true;
-    stageBadge.innerText = `關卡 ${n} / 3`;
+    stageBadge.innerText = `關卡 ${n} / ${TOTAL_STAGES}`;
     // Body classes for CSS to show/hide touch buttons per stage
     document.body.classList.remove('stage-puzzle', 'stage-boss', 'game-lost');
-    document.body.classList.add(n === STAGE.BOSS ? 'stage-boss' : 'stage-puzzle');
+    document.body.classList.add(isBossStage(n) ? 'stage-boss' : 'stage-puzzle');
 
-    if (n === STAGE.BOSS) {
+    if (isBossStage(n)) {
+        const cfg = BOSS_CONFIGS[n];
+        boss.maxHealth = cfg.maxHealth;
         boss.health = boss.maxHealth;
+        boss.width = cfg.width;
+        boss.height = cfg.height;
+        boss.spawnsMinions = cfg.spawnMinions;
         boss.summonTimer = 0;
         boss.stuckObjectTimer = 0;
         boss.firstStuckSpawned = false;
@@ -943,8 +959,10 @@ function loadStage(n) {
         player.facingY = -1;
         player.shootCooldown = 0;
         player.hp = player.maxHp;
-        for (let i = 0; i < MINION_PER_WAVE; i++) spawnMinion(); // 開場就有一波小車車
-        gameStatus.innerText = '🤖 最後一關：擊敗巨型機器能！';
+        if (cfg.spawnMinions) {
+            for (let i = 0; i < MINION_PER_WAVE; i++) spawnMinion();
+        }
+        gameStatus.innerText = cfg.statusText;
         gameStatus.style.color = '#FF5C5C';
         gameStatus.style.background = '#241418';
         hpRow.style.display = 'flex';
@@ -952,7 +970,7 @@ function loadStage(n) {
         updatePlayerUI();
         controlsBody.innerHTML =
             '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動（八方向）<br>' +
-            '<kbd>Space</kbd> 發射星星子彈（可打掉小怪，被小怪撞到會扣血）<br>' +
+            '<kbd>Space</kbd> 發射星星子彈' + (cfg.spawnMinions ? '（可打掉小怪，被小怪撞到會扣血）' : '') + '<br>' +
             '<span style="opacity:0.7">魔王 1 分鐘後會召喚積木塔保護自己 — 看到時先打破</span>';
         updateBossUI();
     } else {
@@ -1212,7 +1230,7 @@ function drawPlayer() {
 
     // Cap — in boss stage shows aim direction (where the next bullet flies)
     let capAngle;
-    if (currentStage === STAGE.BOSS) {
+    if (isBossStage(currentStage)) {
         let aimX = 0, aimY = 0;
         if (keys['w']) aimY -= 1;
         if (keys['s']) aimY += 1;
@@ -1783,12 +1801,13 @@ function drawStageIntro() {
     ctx.globalAlpha = a;
     ctx.shadowColor = 'rgba(120,0,0,0.5)';
     ctx.shadowBlur = 8;
-    if (currentStage === STAGE.BOSS) {
+    if (isBossStage(currentStage)) {
+        const cfg = BOSS_CONFIGS[currentStage];
         ctx.fillStyle = '#FF2A2A';
-        ctx.fillText('🤖 最後一關', 0, -10);
+        ctx.fillText(cfg.introTitle, 0, -10);
         ctx.font = '600 24px Fredoka, sans-serif';
         ctx.fillStyle = '#C9C2D0';
-        ctx.fillText('巨型機器能出現了！', 0, 36);
+        ctx.fillText(cfg.introSubtitle, 0, 36);
     } else {
         ctx.fillStyle = '#C83048';
         ctx.fillText(`第 ${currentStage} 關`, 0, -10);
@@ -1873,12 +1892,12 @@ function update() {
     if (!gameActive) {
         // Allow R to retry boss after losing
         if (endOverlay && endOverlay.type === 'lose' && keys['r']) {
-            loadStage(STAGE.BOSS);
+            loadStage(currentStage);
         }
         return;
     }
 
-    if (currentStage === STAGE.BOSS) {
+    if (isBossStage(currentStage)) {
         updateBoss();
     } else {
         updatePuzzle();
@@ -1897,6 +1916,15 @@ function updatePuzzle() {
 }
 
 function updateBoss() {
+    // Stage-clear transition (e.g., mini-boss → main boss): freeze gameplay
+    // and load the next stage after a short beat.
+    if (stageState === 'won') {
+        transitionTimer++;
+        if (transitionTimer > 90) {
+            loadStage(currentStage + 1);
+        }
+        return;
+    }
     // 8-way movement (normalized so diagonal isn't faster than cardinal)
     let mvX = 0, mvY = 0;
     if (keys['w']) mvY -= 1;
@@ -2029,7 +2057,7 @@ function updateBoss() {
     boss.summonTimer++;
     boss.stuckObjectTimer++;
 
-    if (boss.summonTimer > MINION_INTERVAL) {
+    if (boss.spawnsMinions && boss.summonTimer > MINION_INTERVAL) {
         for (let i = 0; i < MINION_PER_WAVE; i++) spawnMinion();
         boss.summonTimer = 0;
     }
@@ -2070,7 +2098,7 @@ function draw() {
     ctx.save();
     ctx.translate(shakeX, shakeY);
 
-    if (currentStage === STAGE.BOSS) {
+    if (isBossStage(currentStage)) {
         drawBossBackground();
         stuckObjects.forEach(drawStuckBlock);
         minions.forEach(drawMinion);
@@ -2124,8 +2152,19 @@ function updateBossUI() {
     hpText.innerText = Math.max(0, boss.health);
     let healthPercent = (boss.health / boss.maxHealth) * 100;
     bossHealthBar.style.width = healthPercent + '%';
-    if (boss.health <= 0) {
-        endGame(true);
+    if (boss.health <= 0 && stageState === 'playing') {
+        if (currentStage === STAGE.MINI_BOSS) {
+            // Mini-boss cleared — advance to the main boss after a brief beat
+            stageState = 'won';
+            transitionTimer = 0;
+            gameStatus.innerText = '✨ 擊敗小魔王！前往下一關...';
+            gameStatus.style.color = '#6FCF9A';
+            gameStatus.style.background = '#14201A';
+            for (let i = 0; i < 4; i++) spawnParticles(boss.x, boss.y, null, 24, 'confetti');
+            applyShake(5, 14);
+        } else {
+            endGame(true);
+        }
     }
 }
 
