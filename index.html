@@ -77,6 +77,50 @@
             z-index: 100;
         }
 
+        /* Puzzle stages (1–2) use tap d-pad buttons; boss stages use the
+           joystick. Both share the same bottom-left slot. */
+        #dpad {
+            position: absolute;
+            /* Keep the lowest (down) button clear of the phone's bottom
+               home-bar / gesture strip, otherwise holding it triggers a
+               touchcancel and "move down" stops. */
+            bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+            left: 18px;
+            width: 168px;
+            height: 168px;
+            pointer-events: auto;
+            display: none;
+        }
+        body.touch.stage-puzzle #dpad { display: block; }
+        .dbtn {
+            position: absolute;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(40,38,48,0.88);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 0 0 1.5px rgba(160,30,40,0.4), inset 0 -3px 0 rgba(0,0,0,0.3);
+            color: var(--ink);
+            font-size: 28px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: none;
+            transition: transform 0.05s, background 0.05s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .dbtn.pressed {
+            background: var(--pink);
+            color: white;
+            transform: scale(0.92);
+        }
+        .dbtn[data-key="w"] { top: 0;   left: 56px; }
+        .dbtn[data-key="a"] { top: 56px; left: 0; }
+        .dbtn[data-key="d"] { top: 56px; right: 0; }
+        .dbtn[data-key="s"] { top: 112px; left: 56px; }
+
         #joystick {
             position: absolute;
             /* Keep clear of the phone's bottom home-bar / gesture strip. */
@@ -93,7 +137,9 @@
             pointer-events: auto;
             touch-action: none;
             -webkit-tap-highlight-color: transparent;
+            display: none;
         }
+        body.touch.stage-boss #joystick { display: block; }
         #joystickKnob {
             position: absolute;
             left: 50%; top: 50%;
@@ -212,9 +258,14 @@
             #gameStatus { font-size: 0.85em; padding: 6px 14px; white-space: normal; text-align: center; }
             #hpRow, #playerHpRow { font-size: 0.75em; padding: 4px 10px 4px 12px; }
             .health-bar-container { width: 140px; height: 10px; }
-            #joystick { width: 144px; height: 144px;
+            #dpad, #joystick { width: 144px; height: 144px;
                         bottom: calc(24px + env(safe-area-inset-bottom, 0px)); left: 14px; }
             #joystickKnob { width: 60px; height: 60px; margin-left: -30px; margin-top: -30px; }
+            .dbtn { width: 48px; height: 48px; font-size: 22px; }
+            .dbtn[data-key="w"] { top: 0; left: 48px; }
+            .dbtn[data-key="a"] { top: 48px; left: 0; }
+            .dbtn[data-key="d"] { top: 48px; right: 0; }
+            .dbtn[data-key="s"] { top: 96px; left: 48px; }
             #fireBtn { width: 80px; height: 80px;
                        bottom: calc(30px + env(safe-area-inset-bottom, 0px));
                        right: 18px; font-size: 36px; }
@@ -381,12 +432,17 @@
             #hpRow, #playerHpRow { font-size: 0.6em; padding: 2px 8px 2px 9px; gap: 6px; }
             #hpRow .hp-text, #playerHpRow .hp-text { min-width: 0; }
             .health-bar-container { width: 90px; height: 8px; }
-            #joystick {
+            #dpad, #joystick {
                 width: 120px; height: 120px;
                 bottom: calc(14px + env(safe-area-inset-bottom, 0px));
                 left: 14px;
             }
             #joystickKnob { width: 52px; height: 52px; margin-left: -26px; margin-top: -26px; }
+            .dbtn { width: 40px; height: 40px; font-size: 18px; }
+            .dbtn[data-key="w"] { top: 0; left: 40px; }
+            .dbtn[data-key="a"] { top: 40px; left: 0; }
+            .dbtn[data-key="d"] { top: 40px; right: 0; }
+            .dbtn[data-key="s"] { top: 80px; left: 40px; }
             #fireBtn {
                 width: 64px; height: 64px; font-size: 28px;
                 bottom: calc(18px + env(safe-area-inset-bottom, 0px));
@@ -446,6 +502,12 @@
 </div>
 
 <div id="touchControls">
+    <div id="dpad">
+        <button class="dbtn" data-key="w" aria-label="上">▲</button>
+        <button class="dbtn" data-key="a" aria-label="左">◄</button>
+        <button class="dbtn" data-key="d" aria-label="右">►</button>
+        <button class="dbtn" data-key="s" aria-label="下">▼</button>
+    </div>
     <div id="joystick" aria-label="搖桿">
         <div id="joystickKnob"></div>
     </div>
@@ -724,6 +786,9 @@ function bindTouchButton(el) {
     el.addEventListener('contextmenu', e => e.preventDefault());
 }
 
+// Puzzle-stage d-pad (tap to step). Shown only on stages 1–2; the boss
+// stages use the joystick instead.
+document.querySelectorAll('.dbtn').forEach(bindTouchButton);
 bindTouchButton(document.getElementById('fireBtn'));
 bindTouchButton(document.getElementById('resetBtn'));
 
@@ -923,6 +988,10 @@ function loadStage(n) {
     currentStage = n;
     stageState = 'playing';
     transitionTimer = 0;
+    // Clear held movement keys — the control scheme swaps between stages
+    // (d-pad on puzzles, joystick on boss), so a held input must not stick.
+    keys['w'] = keys['a'] = keys['s'] = keys['d'] = false;
+    document.querySelectorAll('.dbtn.pressed').forEach(el => el.classList.remove('pressed'));
     stageIntroTimer = 90; // ~1.5s intro fade
     bullets = [];
     minions = [];
