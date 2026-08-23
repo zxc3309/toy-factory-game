@@ -647,6 +647,9 @@ const MINION_INTERVAL = 300; // 5s @ 60fps
 const MINION_PER_WAVE = 1;   // minions spawned per wave
 const MINION_HP = 2;             // star bullets needed to destroy a minion
 const MINION_CONTACT_DAMAGE = 25; // HP the player loses when a minion rams them
+const MINION_RADIUS = 22;        // 2× the original 11 — a bigger, easier target
+const MINION_SPEED = 1.15;       // a touch slower than before (was 1.5)
+const MINION_ART_RADIUS = 11;    // radius the car artwork was drawn for (scale base)
 
 let bullets = [];
 let minions = [];
@@ -702,9 +705,9 @@ function spawnMinion() {
     minions.push({
         x: boss.x + (Math.random() - 0.5) * 200,
         y: boss.y + boss.height / 2 + 30,
-        radius: 11,
+        radius: MINION_RADIUS,
         color,
-        speed: 1.5,
+        speed: MINION_SPEED,
         wheelRotation: 0,
         hp: MINION_HP,
         hitFlash: 0
@@ -1539,42 +1542,45 @@ function drawBullet(b) {
 // =============================================================
 function drawMinion(m) {
     const angle = Math.atan2(player.y - m.y, player.x - m.x);
+    // Detail sizes were drawn for MINION_ART_RADIUS; scale them with the car
+    // so a bigger minion keeps its proportions (wheels, eyes, wind-up key).
+    const s = m.radius / MINION_ART_RADIUS;
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.beginPath();
-    ctx.ellipse(m.x, m.y + m.radius + 3, m.radius * 0.9, 3.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(m.x, m.y + m.radius + 3 * s, m.radius * 0.9, 3.5 * s, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.save();
     ctx.translate(m.x, m.y);
     ctx.rotate(angle + Math.PI / 2);
     ctx.fillStyle = m.color;
-    roundRectPath(-m.radius * 1.1, -m.radius * 0.9, m.radius * 2.2, m.radius * 1.6, 5);
+    roundRectPath(-m.radius * 1.1, -m.radius * 0.9, m.radius * 2.2, m.radius * 1.6, 5 * s);
     ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.2 * s;
     ctx.stroke();
     if (m.hitFlash > 0) {
         ctx.fillStyle = 'rgba(255,255,255,0.75)';
-        roundRectPath(-m.radius * 1.1, -m.radius * 0.9, m.radius * 2.2, m.radius * 1.6, 5);
+        roundRectPath(-m.radius * 1.1, -m.radius * 0.9, m.radius * 2.2, m.radius * 1.6, 5 * s);
         ctx.fill();
     }
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    roundRectPath(-m.radius * 0.7, -m.radius * 0.5, m.radius * 1.4, m.radius * 0.7, 3);
+    roundRectPath(-m.radius * 0.7, -m.radius * 0.5, m.radius * 1.4, m.radius * 0.7, 3 * s);
     ctx.fill();
     m.wheelRotation = (m.wheelRotation || 0) + 0.4;
     ctx.fillStyle = '#0A0A0C';
     ctx.beginPath();
-    ctx.arc(-m.radius * 0.7, m.radius * 0.85, 3, 0, Math.PI * 2);
-    ctx.arc(m.radius * 0.7, m.radius * 0.85, 3, 0, Math.PI * 2);
+    ctx.arc(-m.radius * 0.7, m.radius * 0.85, 3 * s, 0, Math.PI * 2);
+    ctx.arc(m.radius * 0.7, m.radius * 0.85, 3 * s, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 * s;
     [-1, 1].forEach(side => {
         ctx.save();
         ctx.translate(side * m.radius * 0.7, m.radius * 0.85);
         ctx.rotate(m.wheelRotation * side);
         ctx.beginPath();
-        ctx.moveTo(-2, 0); ctx.lineTo(2, 0);
-        ctx.moveTo(0, -2); ctx.lineTo(0, 2);
+        ctx.moveTo(-2 * s, 0); ctx.lineTo(2 * s, 0);
+        ctx.moveTo(0, -2 * s); ctx.lineTo(0, 2 * s);
         ctx.stroke();
         ctx.restore();
     });
@@ -1582,25 +1588,25 @@ function drawMinion(m) {
     ctx.translate(0, -m.radius * 1.05);
     ctx.rotate(m.wheelRotation * 0.7);
     ctx.strokeStyle = '#FF8030';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * s;
     ctx.beginPath();
-    ctx.moveTo(-4, 0); ctx.lineTo(4, 0);
-    ctx.moveTo(0, -4); ctx.lineTo(0, 4);
+    ctx.moveTo(-4 * s, 0); ctx.lineTo(4 * s, 0);
+    ctx.moveTo(0, -4 * s); ctx.lineTo(0, 4 * s);
     ctx.stroke();
     ctx.fillStyle = '#FF8030';
     ctx.beginPath();
-    ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+    ctx.arc(0, 0, 1.5 * s, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     ctx.fillStyle = 'white';
     ctx.beginPath();
-    ctx.arc(-3, -1, 2.4, 0, Math.PI * 2);
-    ctx.arc(3, -1, 2.4, 0, Math.PI * 2);
+    ctx.arc(-3 * s, -1 * s, 2.4 * s, 0, Math.PI * 2);
+    ctx.arc(3 * s, -1 * s, 2.4 * s, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#0A0A0C';
     ctx.beginPath();
-    ctx.arc(-3, -0.5, 1.2, 0, Math.PI * 2);
-    ctx.arc(3, -0.5, 1.2, 0, Math.PI * 2);
+    ctx.arc(-3 * s, -0.5 * s, 1.2 * s, 0, Math.PI * 2);
+    ctx.arc(3 * s, -0.5 * s, 1.2 * s, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 }
